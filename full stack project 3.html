@@ -1,0 +1,139 @@
+const express = require('express');
+const sqlite3 = require('sqlite3').verbose();
+const cors = require('cors');
+
+const app = express();
+const PORT = 3000;
+
+app.use(express.json());
+app.use(cors());
+
+const db = new sqlite3.Database('database.db');
+
+// Create table
+db.serialize(() => {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      description TEXT
+    )
+  `);
+});
+
+// CREATE
+app.post('/items', (req, res) => {
+  const { name, description } = req.body;
+
+  db.run(
+    "INSERT INTO items (name, description) VALUES (?, ?)",
+    [name, description],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ id: this.lastID, name, description });
+    }
+  );
+});
+
+// READ ALL
+app.get('/items', (req, res) => {
+  db.all("SELECT * FROM items", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// UPDATE
+app.put('/items/:id', (req, res) => {
+  const { name, description } = req.body;
+
+  db.run(
+    "UPDATE items SET name = ?, description = ? WHERE id = ?",
+    [name, description, req.params.id],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ changes: this.changes });
+    }
+  );
+});
+
+// DELETE
+app.delete('/items/:id', (req, res) => {
+  db.run(
+    "DELETE FROM items WHERE id = ?",
+    [req.params.id],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ changes: this.changes });
+    }
+  );
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
+});
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Items CRUD</title>
+</head>
+<body>
+
+<h1>Items Management</h1>
+
+<h2>Add Item</h2>
+<form id="addForm">
+  <input type="text" id="name" placeholder="Name" required />
+  <input type="text" id="description" placeholder="Description" />
+  <button>Add</button>
+</form>
+
+<h2>Items</h2>
+<ul id="items"></ul>
+
+<script>
+const apiUrl = 'http://localhost:3000/items';
+
+document.getElementById('addForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: name.value,
+      description: description.value
+    })
+  });
+
+  loadItems();
+});
+
+async function loadItems() {
+  const res = await fetch(apiUrl);
+  const items = await res.json();
+
+  const list = document.getElementById('items');
+  list.innerHTML = '';
+
+  items.forEach(item => {
+    const li = document.createElement('li');
+    li.innerHTML = `
+      ${item.id} - ${item.name} (${item.description})
+      <button onclick="deleteItem(${item.id})">Delete</button>
+    `;
+    list.appendChild(li);
+  });
+}
+
+async function deleteItem(id) {
+  await fetch(`${apiUrl}/${id}`, { method: 'DELETE' });
+  loadItems();
+}
+
+loadItems();
+</script>
+
+</body>
+</html>
