@@ -1,0 +1,74 @@
+const express = require('express');
+const app = express();
+const PORT = 3000;
+
+// Middleware to handle JSON data
+app.use(express.json());
+// Serve static files (your frontend)
+app.use(express.static('public'));
+
+// Mock Database
+const users = [
+    { id: 1, name: "Alice", role: "Developer" },
+    { id: 2, name: "Bob", role: "Designer" }
+];
+
+// GET Endpoint: Send users to the frontend
+app.get('/api/users', (req, res) => {
+    res.json(users);
+});
+
+// POST Endpoint: Receive new user from frontend
+app.post('/api/users', (req, res) => {
+    const newUser = req.body;
+    users.push(newUser);
+    res.status(201).json({ message: "User added successfully!", user: newUser });
+});
+
+app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Project 4 Integration</title>
+</head>
+<body>
+    <h1>User Directory</h1>
+    <button id="loadBtn">Load Users</button>
+    <ul id="userList"></ul>
+
+    <script src="script.js"></script>
+</body>
+</html>
+const loadBtn = document.getElementById('loadBtn');
+const userList = document.getElementById('userList');
+
+// Mastering async/await for High Readability
+async function fetchAndDisplayUsers() {
+    try {
+        // STAGE 1: Input (Requesting data)
+        const response = await fetch('/api/users');
+        
+        if (!response.ok) throw new Error("Network response was not ok");
+
+        // STAGE 2: Process (Parsing the JSON payload)
+        const data = await response.json();
+
+        // STAGE 3: Output (Updating the DOM)
+        renderUsers(data);
+
+    } catch (error) {
+        console.error("Error connecting to backend:", error);
+        userList.innerHTML = "<li>Failed to load users.</li>";
+    }
+}
+
+function renderUsers(users) {
+    userList.innerHTML = ''; // Clear current list
+    users.forEach(user => {
+        const li = document.createElement('li');
+        li.textContent = `${user.name} - ${user.role}`;
+        userList.appendChild(li);
+    });
+}
+
+loadBtn.addEventListener('click', fetchAndDisplayUsers);
